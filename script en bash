@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# Verificar si el archivo logs.csv existe
+if [ ! -f logs.csv ]; then
+    echo "El archivo logs.csv no existe."
+    exit 1
+fi
+
+# Función para listar usuarios
+listar_usuarios() {
+    echo "Lista de usuarios en el sistema:"
+    cut -d: -f1 /etc/passwd
+}
+
+# Función para listar grupos
+listar_grupos() {
+    echo "Lista de grupos en el sistema:"
+    cut -d: -f1 /etc/group
+}
+
+# Función para listar terminales
+listar_terminales() {
+    echo "Terminales disponibles en el sistema:"
+    ls /dev/tty*
+}
+
+# Función para mostrar grupos de un usuario
+mostrar_grupos_usuario() {
+    read -p "Ingrese el nombre de usuario: " usuario
+    if id "$usuario" &>/dev/null; then
+        echo "Grupos a los que pertenece $usuario:"
+        id -nG "$usuario"
+    else
+        echo "El usuario $usuario no existe."
+    fi
+}
+
+# Función para mostrar usuarios de un grupo
+mostrar_usuarios_grupo() {
+    read -p "Ingrese el nombre del grupo: " grupo
+    if getent group "$grupo" &>/dev/null; then
+        echo "Usuarios del grupo $grupo:"
+        getent group "$grupo" | cut -d: -f4
+    else
+        echo "El grupo $grupo no existe."
+    fi
+}
+
+# Función para mostrar información de un usuario
+mostrar_info_usuario() {
+    read -p "Ingrese el nombre de usuario: " usuario
+    if id "$usuario" &>/dev/null; then
+        echo "Información del usuario $usuario:"
+        echo "Grupos a los que pertenece:"
+        groups "$usuario"
+        echo "Terminales disponibles:"
+        who "$usuario"
+        echo "Permisos de archivos en el directorio home:"
+        ls -l /home/"$usuario"
+        echo "Información de la cuenta:"
+        grep "$usuario" /etc/passwd
+        echo "Contraseña (solo se puede cambiar, no mostrar):"
+        echo "Para cambiar la contraseña, use el comando: sudo passwd $usuario"
+    else
+        echo "El usuario $usuario no existe."
+    fi
+}
+
+# Función para filtrar valores únicos
+filtrar_valores_unicos() {
+    echo "Nombres completos de usuarios:"
+    awk -F, '{print $1}' logs.csv | sort | uniq
+    echo "Nombres de eventos:"
+    awk -F, '{print $2}' logs.csv | sort | uniq
+    echo "Direcciones IP:"
+    awk -F, '{print $4}' logs.csv | sort | uniq
+}
+
+# Función para generar archivo CSV
+generar_archivo_csv() {
+    read -p "Ingrese el nombre completo de usuario: " nombre_usuario
+    if awk -F, -v usuario="$nombre_usuario" '$1 == usuario {print $2 ";" $3}' logs.csv > /dev/null; then
+        echo "Nombre de evento;Marca de tiempo" > "${nombre_usuario// /_}-$(date +%d_%m_%Y).csv"
+        awk -F, -v usuario="$nombre_usuario" '$1 == usuario {print $2 ";" $3}' logs.csv >> "${nombre_usuario// /_}-$(date +%d_%m_%Y).csv"
+        echo "Archivo CSV generado: ${nombre_usuario// /_}-$(date +%d_%m_%Y).csv"
+    else
+        echo "El nombre completo de usuario $nombre_usuario no existe."
+    fi
+}
+
+# Menú principal
+while true; do
+    echo "Menú:"
+    echo "1. Listar usuarios existentes en el sistema"
+    echo "2. Listar todos los grupos existentes en el sistema"
+    echo "3. Listar las terminales disponibles en el sistema"
+    echo "4. Mostrar a qué grupos pertenece un usuario"
+    echo "5. Mostrar los usuarios de un grupo"
+    echo "6. Mostrar toda la información disponible respecto a un usuario"
+    echo "7. Filtrar valores únicos de logs.csv"
+    echo "8. Generar archivo CSV"
+    echo "9. Salir"
+    read -p "Seleccione una opción: " opcion
+
+    case $opcion in
+        1) listar_usuarios ;;
+        2) listar_grupos ;;
+        3) listar_terminales ;;
+        4) mostrar_grupos_usuario ;;
+        5) mostrar_usuarios_grupo ;;
+        6) mostrar_info_usuario ;;
+        7) filtrar_valores_unicos ;;
+        8) generar_archivo_csv ;;
+        9) echo "Saliendo..."; break ;;
+        *) echo "Opción inválida. Intente nuevamente." ;;
+    esac
+done
